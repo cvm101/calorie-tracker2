@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // <-- Added Link for navigation
+import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import FoodSearch from '@/components/FoodSearch';
 import DailyLogsList from '@/components/DailyLogsList';
@@ -11,7 +11,7 @@ import DailyLogsList from '@/components/DailyLogsList';
 export default function DashboardPage() {
     const [user, setUser] = useState<any>(null);
     const [caloriesConsumed, setCaloriesConsumed] = useState(0);
-    const [calorieGoal, setCalorieGoal] = useState(2000); // Default goal
+    const [calorieGoal, setCalorieGoal] = useState(2000); // Default fallback
     const [loading, setLoading] = useState(true);
 
     // State to trigger a re-fetch when food is added or deleted
@@ -30,18 +30,28 @@ export default function DashboardPage() {
 
             setUser(session.user);
 
-            // 2. Get today's date in YYYY-MM-DD format
+            // 2. Fetch the calorie goal from user_settings
+            const { data: settings } = await supabase
+                .from('user_settings')
+                .select('daily_calorie_goal')
+                .eq('id', session.user.id)
+                .single();
+
+            if (settings) {
+                setCalorieGoal(settings.daily_calorie_goal);
+            }
+
+            // 3. Get today's date in YYYY-MM-DD format
             const today = new Date().toISOString().split('T')[0];
 
-            // 3. Fetch all foods eaten TODAY for this user
-            const { data: logs, error } = await supabase
+            // 4. Fetch all foods eaten TODAY for this user
+            const { data: logs } = await supabase
                 .from('daily_logs')
                 .select('calories_consumed')
                 .eq('user_id', session.user.id)
                 .eq('date', today);
 
             if (logs) {
-                // Add up all the calories consumed today
                 const total = logs.reduce((sum, log) => sum + log.calories_consumed, 0);
                 setCaloriesConsumed(total);
             }
@@ -50,11 +60,11 @@ export default function DashboardPage() {
         }
 
         fetchDashboardData();
-    }, [router, refreshTrigger]); // Re-runs when refreshTrigger changes
+    }, [router, refreshTrigger]);
 
-    if (loading) return <div className="text-center mt-20 text-xl font-bold">Loading your dashboard...</div>;
+    if (loading) return <div className="text-center mt-20 text-xl font-bold text-gray-800">Loading your dashboard...</div>;
 
-    // Calculate data for our chart
+    // Calculate data for the chart
     const caloriesLeft = Math.max(calorieGoal - caloriesConsumed, 0);
     const chartData = [
         { name: 'Consumed', value: caloriesConsumed },
@@ -67,13 +77,16 @@ export default function DashboardPage() {
             <div className="max-w-3xl mx-auto space-y-6">
 
                 {/* Header Section */}
-                <div className="bg-white p-6 rounded-xl shadow-sm flex justify-between items-center">
+                <div className="bg-white p-6 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800">Today's Overview</h1>
                         <p className="text-gray-500">{new Date().toLocaleDateString()}</p>
                     </div>
 
                     <div className="flex items-center gap-6">
+                        <Link href="/settings" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                            ⚙️ Settings
+                        </Link>
                         <Link href="/history" className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                             📅 View History
                         </Link>
@@ -110,22 +123,21 @@ export default function DashboardPage() {
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        {/* Text inside the donut chart */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <span className="text-2xl font-bold text-gray-800">{caloriesLeft.toFixed(0)}</span>
-                            <span className="text-xs text-gray-500 uppercase">Left</span>
+                            <span className="text-xs text-gray-500 uppercase font-semibold">Left</span>
                         </div>
                     </div>
 
                     {/* Stats Details */}
                     <div className="flex-1 w-full space-y-4">
                         <div className="flex justify-between border-b pb-2">
-                            <span className="text-gray-600">Daily Goal</span>
-                            <span className="font-bold">{calorieGoal} kcal</span>
+                            <span className="text-gray-600 font-medium">Daily Goal</span>
+                            <span className="font-bold text-gray-900">{calorieGoal} kcal</span>
                         </div>
                         <div className="flex justify-between border-b pb-2">
                             <span className="text-blue-600 font-medium">Consumed</span>
-                            <span className="font-bold">{caloriesConsumed.toFixed(0)} kcal</span>
+                            <span className="font-bold text-gray-900">{caloriesConsumed.toFixed(0)} kcal</span>
                         </div>
                     </div>
                 </div>
