@@ -1,3 +1,5 @@
+# App
+https://calorie-tracker3-zeta.vercel.app/
 # Calorie Tracker
 
 A Next.js 16 + Supabase calorie tracking app with USDA food search, daily logging, charts, and history views.
